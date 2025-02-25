@@ -3,10 +3,12 @@ Main module to run the Retrieval-Augmented Generation (RAG) pipeline.
 """
 
 import logging
+import mlflow
 from src.data_loader import DataLoader
-from src.faiss_indexer import FaissIndexer
+from src.elasticsearch_indexer import ElasticsearchIndexer
 from src.retriever import Retriever
 from src.response_generator import ResponseGenerator
+from src.config import CONFIG
 
 # Configure logging
 logging.basicConfig(
@@ -19,29 +21,23 @@ class RAGPipeline:
 
     def __init__(self) -> None:
         """Initializes the RAG pipeline by loading data and setting up components."""
+        logging.info("Loading knowledge base from CSV...")
         self.data_loader = DataLoader()
-        self.df = self.data_loader.load()
-        self.indexer = FaissIndexer(self.df)
-        self.response_generator = ResponseGenerator()
-        self.index = None
+        self.df = self.data_loader.load_and_generate_embeddings()
 
-    def build_or_load_index(self) -> None:
-        """Loads the FAISS index if available, otherwise builds a new one."""
-        try:
-            self.index = self.indexer.load_index()
-            logging.info("Successfully loaded FAISS index.")
-        except FileNotFoundError:
-            logging.info("FAISS index not found. Building a new one...")
-            self.index = self.indexer.build_index()
-        except Exception as e:
-            logging.error(f"Error loading FAISS index: {e}")
-            logging.info("Building a new FAISS index as a fallback...")
-            self.index = self.indexer.build_index()
+        logging.info("Initializing Elasticsearch indexer...")
+        self.indexer = ElasticsearchIndexer()
+        self.indexer.create_index()
+        
+        logging.info("Indexing documents into Elasticsearch...")
+        self.indexer.index_documents(self.df)
+
+        self.response_generator = ResponseGenerator()
+        logging.info("RAG Pipeline initialized successfully.")
 
     def run(self) -> None:
         """Runs the RAG pipeline interactively."""
-        self.build_or_load_index()
-        retriever = Retriever(self.df, self.index)
+        retriever = Retriever()
 
         while True:
             query = input("\nEnter your query (or type 'exit' to quit): ").strip()
@@ -49,8 +45,17 @@ class RAGPipeline:
                 print("Exiting RAG pipeline. Goodbye!")
                 break
 
-            relevant_docs = retriever.search(query)
-            response = self.response_generator.generate(query, relevant_docs)
+            with mlflow.start_run():
+                mlflow.set_experiment(CONFIG.MLFLOW_EXPERIMENT_NAME)
+                mlflow.log_param("query", query)
+
+                relevant_docs = retriever.search(query, top_k=3)
+                response = self.response_generator.generate(query, relevant_docs)
+
+                mlflow.log_metric("retrieved_docs", len(relevant_docs))
+                mlflow.log_text("\n".join(relevant_docs), "retrieved_documents")
+                mlflow.log_text(response, "generated_response")
+
             print("\nResponse:", response)
 
 

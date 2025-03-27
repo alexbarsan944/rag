@@ -19,6 +19,7 @@ def get_env_variable(name: str) -> str:
 class Config:
     """Configuration dataclass for RAG pipeline."""
 
+    # API Configuration
     OPENAI_API_KEY: str = field(
         default_factory=lambda: get_env_variable("OPENAI_API_KEY")
     )
@@ -37,21 +38,30 @@ class Config:
     KNOWLEDGE_BASE_EMBEDDINGS_PATH: str = field(
         default="data/knowledge_base_with_vectors.json"
     )
+    FAISS_INDEX_PATH: str = field(default="data/faiss_index.bin")
 
-    # Elasticsearch Configuration
-    ELASTICSEARCH_HOST: str = field(
-        default_factory=lambda: get_env_variable("ELASTICSEARCH_HOST")
+    # Chunking Strategy Settings
+    DEFAULT_CHUNK_SIZE: int = field(
+        default_factory=lambda: int(os.getenv("DEFAULT_CHUNK_SIZE", "1000"))
     )
-    ELASTICSEARCH_API_KEY: str = field(
-        default_factory=lambda: get_env_variable("ELASTICSEARCH_API_KEY")
+    DEFAULT_CHUNK_OVERLAP: int = field(
+        default_factory=lambda: int(os.getenv("DEFAULT_CHUNK_OVERLAP", "200"))
     )
-    ELASTICSEARCH_INDEX: str = field(
-        default_factory=lambda: os.getenv("ELASTICSEARCH_INDEX", "rag_knowledge_base")
+    DEFAULT_CHUNK_STRATEGY: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_CHUNK_STRATEGY", "paragraph")
+    )
+    
+    # Embedding Settings
+    EMBEDDING_BATCH_SIZE: int = field(
+        default_factory=lambda: int(os.getenv("EMBEDDING_BATCH_SIZE", "20"))
+    )
+    EMBEDDING_RETRY_LIMIT: int = field(
+        default_factory=lambda: int(os.getenv("EMBEDDING_RETRY_LIMIT", "3"))
     )
 
     # MLflow Configuration
     MLFLOW_TRACKING_URI: str = field(
-        default_factory=lambda: get_env_variable("MLFLOW_TRACKING_URI")
+        default_factory=lambda: os.getenv("MLFLOW_TRACKING_URI", "")
     )
     MLFLOW_EXPERIMENT_NAME: str = field(
         default_factory=lambda: os.getenv("MLFLOW_EXPERIMENT_NAME", "RAG_Experiment")

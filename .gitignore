@@ -4,3 +4,6 @@
 .gitattributes
 /mlflow_artifacts
 *.db
+*.pkl
+*.npz
+*.json
